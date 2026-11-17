@@ -193,7 +193,12 @@ jobs:
 
     steps:
       - name: Trigger Dokploy webhook
-        if: ${{ secrets.DOKPLOY_WEBHOOK_URL != '' }}
+        env:
+          DOKPLOY_WEBHOOK_URL: ${{ secrets.DOKPLOY_WEBHOOK_URL }}
         run: |
+          if [ -z "$DOKPLOY_WEBHOOK_URL" ]; then
+            echo "DOKPLOY_WEBHOOK_URL secret is not set; skipping Dokploy redeploy."
+            exit 0
+          fi
           echo "Triggering redeploy on Dokploy..."
-          curl -X POST "${{ secrets.DOKPLOY_WEBHOOK_URL }}" -f
+          curl -X POST "$DOKPLOY_WEBHOOK_URL" -f
