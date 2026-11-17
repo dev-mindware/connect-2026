@@ -15,7 +15,7 @@ import type { MailService } from './services/mail.service';
 function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
   return {
     NODE_ENV: 'test',
-    PORT: 3010,
+    PORT: 3030,
     MAX_REGISTRATIONS: 2,
     FRONTEND_URL: 'http://localhost:5173',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',

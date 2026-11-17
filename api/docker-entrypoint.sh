@@ -20,5 +20,5 @@ done
 
 echo "==> Migrações aplicadas com sucesso."
 
-echo "==> A iniciar a API na porta ${PORT:-3010}..."
+echo "==> A iniciar a API na porta ${PORT:-3030}..."
 exec node dist/main.js

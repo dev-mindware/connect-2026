@@ -37,7 +37,7 @@ RUN apk add --no-cache openssl dumb-init curl
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3010
+ENV PORT=3030
 
 COPY --chown=node:node --from=prod-deps /app/node_modules ./node_modules
 COPY --chown=node:node --from=builder /app/dist ./dist
@@ -49,7 +49,7 @@ RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
 USER node
 
-EXPOSE 3010
+EXPOSE 3030
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -f http://127.0.0.1:${PORT}/ || exit 1

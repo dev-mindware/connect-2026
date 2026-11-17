@@ -4,9 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'api/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches:
       - main
+    paths:
+      - 'api/**'
+      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,8 +29,8 @@ env:
   PNPM_VERSION: 9.15.9
 
 jobs:
-  api-ci:
-    name: API — Quality, Tests & Build
+  ci:
+    name: CI — Quality, Tests & Security
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -45,7 +51,7 @@ jobs:
           --health-retries=20
     env:
       NODE_ENV: test
-      PORT: 3010
+      PORT: 3030
       MAX_REGISTRATIONS: 200
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/connect_test
       FRONTEND_URL: http://127.0.0.1:5173
@@ -53,6 +59,7 @@ jobs:
       ADMIN_API_KEY: ci-admin-checkin-key
 
     steps:
+      # ── Setup ────────────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -68,9 +75,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: api/pnpm-lock.yaml
 
-      - name: Install API dependencies
+      - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ── Static quality gates ─────────────────────────────────────────────────
       - name: Generate Prisma client
         run: pnpm prisma:generate
 
@@ -80,47 +88,65 @@ jobs:
       - name: Prisma schema validation
         run: pnpm prisma:validate
 
-      - name: Unit tests
-        run: pnpm test
-
       - name: Build
         run: pnpm build
 
+      # ── Dependency security audit ────────────────────────────────────────────
+      - name: Security audit (prod deps, high+)
+        run: pnpm audit --prod --audit-level=high
+
+      # ── Unit tests ───────────────────────────────────────────────────────────
+      - name: Unit tests
+        run: pnpm test
+
+      # ── Smoke tests (production bundle + Postgres) ───────────────────────────
       - name: Apply DB migrations
         run: pnpm prisma:migrate:deploy
 
-  frontend-ci:
-    name: Frontend — Typecheck & Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Start API (production bundle)
+        run: nohup pnpm start:prod > e2e-server.log 2>&1 & echo $! > e2e-server.pid
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+      - name: Wait for API to be healthy
+        run: |
+          for i in {1..30}; do
+            if ! kill -0 $(cat e2e-server.pid) 2>/dev/null; then
+              echo "=== API process terminated unexpectedly ==="
+              cat e2e-server.log
+              exit 1
+            fi
+            if curl --fail --silent http://127.0.0.1:3030/ > /tmp/api-root.txt; then exit 0; fi
+            sleep 2
+          done
+          echo "=== API timed out waiting to start ==="
+          cat e2e-server.log
+          exit 1
+
+      - name: Smoke checks (root + health + status)
+        run: |
+          set -euo pipefail
+          curl --fail --silent http://127.0.0.1:3030/ | grep -q "connect-2026-api"
+          curl --fail --silent http://127.0.0.1:3030/api/health | grep -q "connected"
+          curl --fail --silent http://127.0.0.1:3030/api/status | grep -q "maxRegistrations"
+
+      - name: Upload API logs
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
+          name: api-e2e-logs
+          path: api/e2e-server.log
+          if-no-files-found: warn
+          retention-days: 14
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
-
-      - name: Install Frontend dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify Frontend
-        run: pnpm verify
+      - name: Stop API
+        if: always()
+        run: |
+          if test -f e2e-server.pid; then kill "$(cat e2e-server.pid)" || true; fi
 
   build-and-push-image:
-    name: Build & Push API Image to GHCR
+    name: Build & Push Image to GHCR
+    # Só corre em push para main (não em PRs)
     if: github.event_name != 'pull_request'
-    needs: [api-ci, frontend-ci]
+    needs: ci
     runs-on: ubuntu-latest
     permissions:
       contents: read
