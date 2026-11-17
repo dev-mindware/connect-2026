@@ -1,0 +1,14 @@
+{
+  "name": "connect-2026",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev:frontend": "pnpm --dir frontend dev",
+    "dev:api": "pnpm --dir api start:dev",
+    "build:frontend": "pnpm --dir frontend build",
+    "build:api": "pnpm --dir api build",
+    "verify:frontend": "pnpm --dir frontend verify",
+    "verify:api": "pnpm --dir api verify",
+    "verify": "pnpm verify:api && pnpm verify:frontend"
+  }
+}

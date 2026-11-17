@@ -1,0 +1,6 @@
+id: no-dangerously-set-inner-html
+language: tsx
+severity: error
+message: "Evite dangerouslySetInnerHTML para prevenir vulnerabilidades de XSS."
+rule:
+  pattern: dangerouslySetInnerHTML

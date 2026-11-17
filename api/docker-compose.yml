@@ -1,0 +1,69 @@
+services:
+  connect-api:
+    image: ghcr.io/${GHCR_OWNER:-dev-mindware}/connect-2026-api:latest
+    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: connect_2026_api
+    restart: always
+    ports:
+      - "${API_PORT:-3010}:${PORT:-3010}"
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - connect_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:${PORT:-3010}/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: connect_2026_postgres
+    restart: always
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-connect}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-connect_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-connect2026}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - connect_pgdata:/var/lib/postgresql/data
+    networks:
+      - connect_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-connect} -d ${POSTGRES_DB:-connect2026}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  connect_net:
+    driver: bridge
+
+volumes:
+  connect_pgdata:

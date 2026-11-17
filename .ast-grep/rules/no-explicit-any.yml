@@ -1,0 +1,7 @@
+id: no-explicit-any
+language: typescript
+severity: warning
+message: "Evite o uso de `any` explícito; utilize tipos estritos ou `unknown`."
+rule:
+  pattern: "any"
+  kind: predefined_type

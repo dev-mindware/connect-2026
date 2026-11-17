@@ -1,0 +1,8 @@
+id: no-eval-calls
+language: typescript
+severity: error
+message: "Nunca utilize eval() ou new Function() por razões de segurança."
+rule:
+  any:
+    - pattern: eval($$$ARGS)
+    - pattern: new Function($$$ARGS)
