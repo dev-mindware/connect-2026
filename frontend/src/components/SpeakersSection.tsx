@@ -26,11 +26,15 @@ export function SpeakersSection() {
           {SPEAKERS.map((speaker) => (
             <Card key={speaker.id} className="justify-between">
               <CardHeader>
-                <Avatar className="size-16">
+                <Avatar className="size-24 border bg-secondary">
                   {speaker.imageUrl ? (
-                    <AvatarImage src={speaker.imageUrl} alt={speaker.name} />
+                    <AvatarImage
+                      src={speaker.imageUrl}
+                      alt={speaker.name}
+                      className="object-cover object-top"
+                    />
                   ) : null}
-                  <AvatarFallback className="bg-primary text-base font-semibold text-primary-foreground">
+                  <AvatarFallback className="bg-primary text-lg font-semibold text-primary-foreground">
                     {speaker.initials}
                   </AvatarFallback>
                 </Avatar>

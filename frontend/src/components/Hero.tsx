@@ -1,5 +1,6 @@
-import { Badge } from '@/components/ui/badge';
+import { ConnectLogo } from '@/components/ConnectLogo';
 import { RegistrationCard } from '@/components/RegistrationCard';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { EVENT_INFO } from '@/data/event';
 import type { EventCapacityStatus } from '@/lib/api';
@@ -16,11 +17,10 @@ export function Hero({ status, onRegistered }: HeroProps) {
         <div className="space-y-6 lg:col-span-6 lg:pt-2">
           <Badge variant="secondary">{EVENT_INFO.admission}</Badge>
 
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-              Connect <span className="text-primary">2026</span>
-            </h1>
-            <p className="text-lg font-medium text-muted-foreground sm:text-xl">
+          <div className="space-y-4">
+            <h1 className="sr-only">{EVENT_INFO.name}</h1>
+            <ConnectLogo variant="hero" />
+            <p className="text-lg font-medium text-foreground sm:text-xl">
               {EVENT_INFO.theme}
             </p>
           </div>

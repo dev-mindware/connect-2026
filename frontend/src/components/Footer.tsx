@@ -1,13 +1,14 @@
-import { EVENT_INFO } from '@/data/event';
+import { ConnectLogo } from '@/components/ConnectLogo';
 import { Separator } from '@/components/ui/separator';
+import { EVENT_INFO } from '@/data/event';
 
 export function Footer() {
   return (
     <footer className="border-t bg-background">
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <div className="flex flex-col justify-between gap-4 text-sm sm:flex-row sm:items-center">
-          <div>
-            <p className="font-semibold text-foreground">{EVENT_INFO.name}</p>
+          <div className="space-y-1">
+            <ConnectLogo variant="compact" />
             <p className="text-xs text-muted-foreground">
               Organização: {EVENT_INFO.organization} — {EVENT_INFO.organizationFull}
             </p>

@@ -7,6 +7,15 @@ if [ -z "$DATABASE_URL" ] && [ -n "$POSTGRES_USER" ] && [ -n "$POSTGRES_PASSWORD
   echo "==> DATABASE_URL derivada automaticamente de POSTGRES_USER, POSTGRES_PASSWORD e POSTGRES_DB."
 fi
 
+# Dentro de um container Docker, localhost/127.0.0.1 aponta para o próprio container da API,
+# nunca para o serviço Postgres do docker-compose. Ajusta automaticamente quando detectado.
+case "$DATABASE_URL" in
+  *@localhost:*|*@127.0.0.1:*|*@localhost/*|*@127.0.0.1/*)
+    export DATABASE_URL=$(printf '%s' "$DATABASE_URL" | sed -E 's/@(localhost|127\.0\.0\.1)(:[0-9]+)?/@postgres:5432/')
+    echo "==> DATABASE_URL apontava para localhost/127.0.0.1 dentro do container; ajustada para 'postgres:5432'."
+    ;;
+esac
+
 echo "==> A verificar migrações da base de dados..."
 ok=0
 for i in $(seq 1 10); do
