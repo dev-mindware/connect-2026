@@ -45,7 +45,8 @@ playwright-report/
 *.db-journal
 *.sqlite
 *.sqlite3
-data/
+/data/
+/api/data/
 
 # ─── OS & editors ─────────────────────────────────────────────
 .DS_Store
