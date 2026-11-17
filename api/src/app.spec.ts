@@ -18,6 +18,7 @@ function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
     PORT: 3030,
     MAX_REGISTRATIONS: 2,
     FRONTEND_URL: 'http://localhost:5173',
+    PUBLIC_FRONTEND_URL: '',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     TICKET_SECRET: 'test-ticket-secret-with-more-than-32-characters',
     ADMIN_API_KEY: 'test-admin-api-key',
@@ -162,6 +163,9 @@ describe('Connect 2026 API', () => {
     expect(res.body.registration.email).toBe('ana@example.com');
     expect(res.body.registration.whatsapp).toBe('+244934242419');
     expect(res.body.registration.ticketCode).toMatch(/^C26-[A-Z0-9]{6}$/);
+    expect(res.body.registration.qrUrl).toBe(
+      `http://localhost:5173/convite?token=${encodeURIComponent(res.body.registration.qrToken)}`,
+    );
     expect(res.body.registration.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
     expect(res.body.registration.emailStatus).toBe('SENT');
     expect(sendInvitation).toHaveBeenCalledTimes(1);
@@ -287,5 +291,59 @@ describe('Connect 2026 API', () => {
     expect(docsRes.status).toBe(200);
     expect(docsRes.headers['content-type']).toContain('text/html');
     expect(docsRes.text).toContain('/api/openapi.json');
+  });
+
+  it('devolve os dados do inscrito em /api/tickets/verify e aceita URL completo no check-in', async () => {
+    const repository = createInMemoryRepository();
+    const mailService: MailService = {
+      sendInvitation: vi.fn().mockResolvedValue({ status: 'SKIPPED', provider: 'none' }),
+    };
+    const app = createApp({
+      env: createTestEnv({
+        MAX_REGISTRATIONS: 10,
+        PUBLIC_FRONTEND_URL: 'https://connect.exemplo.com',
+      }),
+      repository,
+      mailService,
+    });
+
+    const created = await request(app).post('/api/registrations').send({
+      fullName: 'Joana Pedro',
+      address: 'Kilamba, Luanda',
+      email: 'joana@example.com',
+      whatsapp: '923456789',
+    });
+
+    const { qrToken, qrUrl } = created.body.registration as {
+      qrToken: string;
+      qrUrl: string;
+    };
+    expect(qrUrl.startsWith('https://connect.exemplo.com/convite?token=')).toBe(
+      true,
+    );
+
+    const verifyRes = await request(app).get(
+      `/api/tickets/verify?token=${encodeURIComponent(qrToken)}`,
+    );
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.registration).toMatchObject({
+      fullName: 'Joana Pedro',
+      address: 'Kilamba, Luanda',
+      email: 'joana@example.com',
+      whatsapp: '+244923456789',
+      checkedInAt: null,
+    });
+
+    const invalidVerify = await request(app).get(
+      '/api/tickets/verify?token=C26-AAAAAA.invalid',
+    );
+    expect(invalidVerify.status).toBe(400);
+
+    const checkinByUrl = await request(app)
+      .post('/api/checkin')
+      .set('x-admin-api-key', 'test-admin-api-key')
+      .send({ qrToken: qrUrl });
+    expect(checkinByUrl.status).toBe(200);
+    expect(checkinByUrl.body.attendee.fullName).toBe('Joana Pedro');
   });
 });

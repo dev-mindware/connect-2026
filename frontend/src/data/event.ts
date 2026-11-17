@@ -2,6 +2,9 @@ import isildaPhoto from '../../assets/efe3db9a-2952-451e-b7b1-f9f377d9b464 copia
 import pauloPhoto from '../../assets/843411082_1074975321827046_8942635931170928711_n copiar 2.png';
 import jesusPhoto from '../../assets/WhatsApp Image 2026-11-05 at 12.30.58 copiar 2.png';
 import mariaPhoto from '../../assets/af7a8e9b-eac9-4697-ae3f-f61af16229cc copiar 2.png';
+import eventFlyer from '../../assets/panfleto-connect-2026.jpg';
+
+export const EVENT_FLYER_URL = eventFlyer;
 
 export interface Speaker {
   id: string;

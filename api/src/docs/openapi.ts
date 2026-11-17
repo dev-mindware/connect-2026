@@ -101,6 +101,11 @@ export function buildOpenApiSpec(port: number): Record<string, unknown> {
               type: 'string',
               example: 'C26-7K9P2M.8a1f3b4c5d6e7f8a9b0c1d2e',
             },
+            qrUrl: {
+              type: 'string',
+              example:
+                'https://connect2026.vercel.app/convite?token=C26-7K9P2M.8a1f3b4c5d6e7f8a9b0c1d2e',
+            },
             qrCodeDataUrl: {
               type: 'string',
               example: 'data:image/png;base64,iVBORw0KGgo...',
@@ -124,6 +129,11 @@ export function buildOpenApiSpec(port: number): Record<string, unknown> {
             qrToken: {
               type: 'string',
               example: 'C26-7K9P2M.8a1f3b4c5d6e7f8a9b0c1d2e',
+            },
+            qrUrl: {
+              type: 'string',
+              example:
+                'https://connect2026.vercel.app/convite?token=C26-7K9P2M.8a1f3b4c5d6e7f8a9b0c1d2e',
             },
           },
         },
@@ -257,6 +267,44 @@ export function buildOpenApiSpec(port: number): Record<string, unknown> {
             '200': { description: 'Pedido de reenvio processado' },
             '404': { description: 'Inscrição não encontrada' },
             '429': { description: 'Limite de reenvios atingido' },
+          },
+        },
+      },
+      '/api/tickets/verify': {
+        get: {
+          tags: ['Inscrições'],
+          summary: 'Consultar dados do inscrito a partir do token do QR Code',
+          description:
+            'Valida a assinatura HMAC do token presente no URL do QR Code e devolve os dados do participante.',
+          parameters: [
+            {
+              name: 'token',
+              in: 'query',
+              required: true,
+              schema: {
+                type: 'string',
+                example: 'C26-7K9P2M.8a1f3b4c5d6e7f8a9b0c1d2e',
+              },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Dados do inscrito validados',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      registration: {
+                        $ref: '#/components/schemas/RegistrationTicket',
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            '400': { description: 'Token inválido ou em falta' },
+            '404': { description: 'Inscrição não encontrada' },
           },
         },
       },

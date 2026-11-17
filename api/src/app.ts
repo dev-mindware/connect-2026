@@ -13,8 +13,10 @@ import {
 } from './schemas/registration.schema';
 import type { MailService } from './services/mail.service';
 import {
+  buildTicketQrUrl,
   createSignedTicket,
   renderQrAssets,
+  resolveFrontendBaseUrl,
   verifyQrToken,
 } from './services/ticket.service';
 
@@ -46,6 +48,10 @@ export function createApp({
   app.set('trust proxy', 1);
 
   const allowedOrigins = parseAllowedOrigins(env.FRONTEND_URL);
+  const frontendBaseUrl = resolveFrontendBaseUrl(
+    env.PUBLIC_FRONTEND_URL,
+    env.FRONTEND_URL,
+  );
   const openApiSpec = buildOpenApiSpec(env.PORT);
 
   app.use(
@@ -181,7 +187,10 @@ export function createApp({
       }
 
       try {
-        const ticket = await createSignedTicket(env.TICKET_SECRET);
+        const ticket = await createSignedTicket(
+          env.TICKET_SECRET,
+          frontendBaseUrl,
+        );
         const outcome = await repository.createWithCapacity({
           fullName: parsed.data.fullName,
           address: parsed.data.address,
@@ -243,6 +252,7 @@ export function createApp({
             whatsapp: outcome.registration.whatsapp,
             ticketCode: outcome.registration.ticketCode,
             qrToken: outcome.registration.qrToken,
+            qrUrl: ticket.qrUrl,
             qrCodeDataUrl: ticket.qrCodeDataUrl,
             emailStatus: mailResult.status,
             createdAt: outcome.registration.createdAt.toISOString(),
@@ -284,7 +294,8 @@ export function createApp({
           return;
         }
 
-        const { qrCodePngBuffer } = await renderQrAssets(record.qrToken);
+        const qrUrl = buildTicketQrUrl(record.qrToken, frontendBaseUrl);
+        const { qrCodePngBuffer } = await renderQrAssets(qrUrl);
         const mailResult = await mailService.sendInvitation({
           fullName: record.fullName,
           email: record.email,
@@ -316,6 +327,64 @@ export function createApp({
       }
     },
   );
+
+  app.get('/api/tickets/verify', async (req: Request, res: Response) => {
+    const rawToken =
+      typeof req.query.token === 'string' ? req.query.token.trim() : '';
+
+    if (!rawToken) {
+      res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Token do convite em falta.',
+      });
+      return;
+    }
+
+    const verification = verifyQrToken(rawToken, env.TICKET_SECRET);
+    if (!verification.valid || !verification.ticketCode) {
+      res.status(400).json({
+        error: 'INVALID_QR_SIGNATURE',
+        message: 'Convite inválido ou assinatura adulterada.',
+      });
+      return;
+    }
+
+    try {
+      const record = await repository.findByTicketCode(verification.ticketCode);
+      if (!record) {
+        res.status(404).json({
+          error: 'NOT_FOUND',
+          message: 'Inscrição não encontrada.',
+        });
+        return;
+      }
+
+      const qrUrl = buildTicketQrUrl(record.qrToken, frontendBaseUrl);
+      const { qrCodeDataUrl } = await renderQrAssets(qrUrl);
+
+      res.status(200).json({
+        registration: {
+          id: record.id,
+          fullName: record.fullName,
+          address: record.address,
+          email: record.email,
+          whatsapp: record.whatsapp,
+          ticketCode: record.ticketCode,
+          qrToken: record.qrToken,
+          qrUrl,
+          qrCodeDataUrl,
+          emailStatus: record.emailStatus,
+          checkedInAt: record.checkedInAt?.toISOString() ?? null,
+          createdAt: record.createdAt.toISOString(),
+        },
+      });
+    } catch {
+      res.status(500).json({
+        error: 'INTERNAL_ERROR',
+        message: 'Não foi possível consultar os dados do convite.',
+      });
+    }
+  });
 
   app.post('/api/checkin', async (req: Request, res: Response) => {
     const providedKey = req.header('x-admin-api-key') ?? '';

@@ -30,8 +30,10 @@ export interface TicketRegistration {
   whatsapp: string;
   ticketCode: string;
   qrToken: string;
+  qrUrl?: string;
   qrCodeDataUrl: string;
   emailStatus: 'PENDING' | 'SENT' | 'SKIPPED' | 'FAILED';
+  checkedInAt?: string | null;
   createdAt: string;
 }
 
@@ -112,6 +114,79 @@ export async function resendInvitationEmail(ticketCode: string): Promise<{
   return {
     emailStatus: data.emailStatus ?? 'SKIPPED',
     message: data.message ?? 'Pedido processado.',
+  };
+}
+
+export async function verifyTicketByToken(
+  token: string,
+): Promise<TicketRegistration> {
+  const res = await fetch(
+    apiUrl(`/api/tickets/verify?token=${encodeURIComponent(token)}`),
+  );
+
+  const data = (await res.json().catch(() => ({}))) as {
+    message?: string;
+    error?: string;
+    registration?: TicketRegistration;
+  };
+
+  if (!res.ok || !data.registration) {
+    throw new ApiRequestError(
+      data.message ?? 'Convite inválido ou não encontrado.',
+      data.error ?? 'TICKET_VERIFY_FAILED',
+      res.status,
+    );
+  }
+
+  return data.registration;
+}
+
+export async function checkInTicket(
+  qrToken: string,
+  adminApiKey: string,
+): Promise<{
+  message: string;
+  attendee: {
+    fullName: string;
+    ticketCode: string;
+    checkedInAt: string | null;
+  };
+}> {
+  const res = await fetch(apiUrl('/api/checkin'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-api-key': adminApiKey,
+    },
+    body: JSON.stringify({ qrToken }),
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    message?: string;
+    error?: string;
+    checkedInAt?: string;
+    attendee?: {
+      fullName: string;
+      ticketCode: string;
+      checkedInAt?: string | null;
+    };
+  };
+
+  if (!res.ok || !data.attendee) {
+    throw new ApiRequestError(
+      data.message ?? 'Não foi possível validar o check-in.',
+      data.error ?? 'CHECKIN_FAILED',
+      res.status,
+    );
+  }
+
+  return {
+    message: data.message ?? 'Check-in validado.',
+    attendee: {
+      fullName: data.attendee.fullName,
+      ticketCode: data.attendee.ticketCode,
+      checkedInAt: data.attendee.checkedInAt ?? data.checkedInAt ?? null,
+    },
   };
 }
 

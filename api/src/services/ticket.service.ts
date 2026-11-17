@@ -6,6 +6,7 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export interface GeneratedTicket {
   ticketCode: string;
   qrToken: string;
+  qrUrl: string;
   qrCodeDataUrl: string;
   qrCodePngBuffer: Buffer;
 }
@@ -28,18 +29,57 @@ export function signTicketCode(ticketCode: string, secret: string): string {
   return `${ticketCode}.${signature}`;
 }
 
+export function resolveFrontendBaseUrl(
+  publicFrontendUrl?: string,
+  corsOrigins?: string,
+): string {
+  const trimmedPublic = (publicFrontendUrl ?? '').trim().replace(/\/+$/, '');
+  if (trimmedPublic) {
+    return trimmedPublic;
+  }
+
+  const firstOrigin = (corsOrigins ?? '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .find((origin) => /^https?:\/\//i.test(origin));
+
+  return firstOrigin ?? 'http://localhost:5173';
+}
+
+export function buildTicketQrUrl(qrToken: string, frontendBaseUrl: string): string {
+  const base = frontendBaseUrl.replace(/\/+$/, '');
+  return `${base}/convite?token=${encodeURIComponent(qrToken)}`;
+}
+
+export function extractQrToken(rawInput: string): string {
+  const trimmed = rawInput.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const parsed = new URL(trimmed);
+      const tokenParam = parsed.searchParams.get('token');
+      if (tokenParam) {
+        return tokenParam.trim();
+      }
+    } catch {
+      return trimmed;
+    }
+  }
+  return trimmed;
+}
+
 export function verifyQrToken(
-  qrToken: string,
+  rawInput: string,
   secret: string,
-): { valid: boolean; ticketCode: string | null } {
-  const parts = qrToken.trim().split('.');
+): { valid: boolean; ticketCode: string | null; qrToken: string } {
+  const qrToken = extractQrToken(rawInput);
+  const parts = qrToken.split('.');
   if (parts.length !== 2) {
-    return { valid: false, ticketCode: null };
+    return { valid: false, ticketCode: null, qrToken };
   }
 
   const [ticketCode, providedSig] = parts;
   if (!/^C26-[A-Z0-9]{6}$/.test(ticketCode)) {
-    return { valid: false, ticketCode: null };
+    return { valid: false, ticketCode: null, qrToken };
   }
 
   const expectedToken = signTicketCode(ticketCode, secret);
@@ -48,14 +88,14 @@ export function verifyQrToken(
   const a = Buffer.from(providedSig, 'utf8');
   const b = Buffer.from(expectedSig, 'utf8');
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    return { valid: false, ticketCode: null };
+    return { valid: false, ticketCode: null, qrToken };
   }
 
-  return { valid: true, ticketCode };
+  return { valid: true, ticketCode, qrToken };
 }
 
 export async function renderQrAssets(
-  qrToken: string,
+  qrPayload: string,
 ): Promise<{ qrCodeDataUrl: string; qrCodePngBuffer: Buffer }> {
   const options: QRCode.QRCodeToDataURLOptions = {
     errorCorrectionLevel: 'M',
@@ -68,8 +108,8 @@ export async function renderQrAssets(
   };
 
   const [qrCodeDataUrl, qrCodePngBuffer] = await Promise.all([
-    QRCode.toDataURL(qrToken, options),
-    QRCode.toBuffer(qrToken, { ...options, type: 'png' }),
+    QRCode.toDataURL(qrPayload, options),
+    QRCode.toBuffer(qrPayload, { ...options, type: 'png' }),
   ]);
 
   return { qrCodeDataUrl, qrCodePngBuffer };
@@ -77,14 +117,17 @@ export async function renderQrAssets(
 
 export async function createSignedTicket(
   secret: string,
+  frontendBaseUrl: string,
 ): Promise<GeneratedTicket> {
   const ticketCode = generateTicketCode();
   const qrToken = signTicketCode(ticketCode, secret);
-  const { qrCodeDataUrl, qrCodePngBuffer } = await renderQrAssets(qrToken);
+  const qrUrl = buildTicketQrUrl(qrToken, frontendBaseUrl);
+  const { qrCodeDataUrl, qrCodePngBuffer } = await renderQrAssets(qrUrl);
 
   return {
     ticketCode,
     qrToken,
+    qrUrl,
     qrCodeDataUrl,
     qrCodePngBuffer,
   };
