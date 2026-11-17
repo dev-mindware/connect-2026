@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
+import { apiReference } from '@scalar/express-api-reference';
 import cors from 'cors';
 import express, { type Express, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import type { AppEnv } from './config/env';
+import { buildOpenApiSpec } from './docs/openapi';
 import type { RegistrationRepository } from './repositories/registration.repository';
 import {
   checkinInputSchema,
@@ -44,8 +46,22 @@ export function createApp({
   app.set('trust proxy', 1);
 
   const allowedOrigins = parseAllowedOrigins(env.FRONTEND_URL);
+  const openApiSpec = buildOpenApiSpec(env.PORT);
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+          'script-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+          'style-src': ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
+          'font-src': ["'self'", 'https://cdn.jsdelivr.net', 'https://fonts.gstatic.com', 'data:'],
+          'img-src': ["'self'", 'data:', 'https:'],
+          'connect-src': ["'self'", 'https://proxy.scalar.com'],
+        },
+      },
+    }),
+  );
   app.use(
     cors({
       origin(origin, callback) {
@@ -95,6 +111,19 @@ export function createApp({
       status: 'ok',
     });
   });
+
+  app.get('/api/openapi.json', (_req: Request, res: Response) => {
+    res.status(200).json(openApiSpec);
+  });
+
+  const scalarHandler = apiReference({
+    url: '/api/openapi.json',
+    pageTitle: 'Connect 2026 API Reference (Scalar)',
+    theme: 'bluePlanet',
+  });
+
+  app.get('/api/docs', scalarHandler);
+  app.get('/api/reference', scalarHandler);
 
   app.get('/api/health', async (_req: Request, res: Response) => {
     const dbOk = await repository.ping();

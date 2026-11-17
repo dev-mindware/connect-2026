@@ -266,4 +266,26 @@ describe('Connect 2026 API', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('BOT_DETECTED');
   });
+
+  it('expõe a especificação OpenAPI e a documentação Scalar em /api/docs', async () => {
+    const repository = createInMemoryRepository();
+    const mailService: MailService = {
+      sendInvitation: vi.fn(),
+    };
+    const app = createApp({
+      env: createTestEnv(),
+      repository,
+      mailService,
+    });
+
+    const specRes = await request(app).get('/api/openapi.json');
+    expect(specRes.status).toBe(200);
+    expect(specRes.body.openapi).toBe('3.1.0');
+    expect(specRes.body.paths['/api/registrations']).toBeDefined();
+
+    const docsRes = await request(app).get('/api/docs');
+    expect(docsRes.status).toBe(200);
+    expect(docsRes.headers['content-type']).toContain('text/html');
+    expect(docsRes.text).toContain('/api/openapi.json');
+  });
 });

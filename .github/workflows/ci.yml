@@ -121,12 +121,15 @@ jobs:
           cat e2e-server.log
           exit 1
 
-      - name: Smoke checks (root + health + status)
+      - name: Smoke checks (root + health + status + docs)
         run: |
           set -euo pipefail
           curl --fail --silent http://127.0.0.1:3030/ | grep -q "connect-2026-api"
           curl --fail --silent http://127.0.0.1:3030/api/health | grep -q "connected"
           curl --fail --silent http://127.0.0.1:3030/api/status | grep -q "maxRegistrations"
+          curl --fail --silent http://127.0.0.1:3030/api/openapi.json | grep -q "Connect 2026 API"
+          curl --fail --silent http://127.0.0.1:3030/api/docs > /tmp/api-docs.html
+          test -s /tmp/api-docs.html
 
       - name: Upload API logs
         if: always()
