@@ -23,6 +23,7 @@ function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     TICKET_SECRET: 'test-ticket-secret-with-more-than-32-characters',
     ADMIN_API_KEY: 'test-admin-api-key',
+    ADMIN_ACCESS_CODE: '',
     RESEND_API_KEY: '',
     RESEND_FROM_EMAIL: '',
     SMTP_HOST: '',
@@ -44,6 +45,11 @@ function createInMemoryRepository(): RegistrationRepository {
     },
     async count() {
       return items.length;
+    },
+    async findAll() {
+      return [...items].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
     },
     async createWithCapacity(
       params: CreateRegistrationParams,
@@ -378,5 +384,52 @@ describe('Connect 2026 API', () => {
     expect(
       formatSenderAddress('Connect 2026 <no-reply@mindware.ao>'),
     ).toBe('Connect 2026 <no-reply@mindware.ao>');
+  });
+
+  it('protege a listagem de inscritos com ADMIN_ACCESS_CODE do .env', async () => {
+    const repository = createInMemoryRepository();
+    const mailService: MailService = {
+      sendInvitation: vi.fn().mockResolvedValue({ status: 'SKIPPED', provider: 'none' }),
+    };
+    const app = createApp({
+      env: createTestEnv({
+        MAX_REGISTRATIONS: 50,
+        ADMIN_ACCESS_CODE: 'codigo-secreto-2026',
+      }),
+      repository,
+      mailService,
+    });
+
+    await request(app).post('/api/registrations').send({
+      fullName: 'Marta Domingos',
+      address: 'Talatona, Luanda',
+      email: 'marta@example.com',
+      whatsapp: '923111222',
+    });
+
+    const missingCode = await request(app).get('/api/registrations');
+    expect(missingCode.status).toBe(401);
+
+    const wrongCode = await request(app)
+      .get('/api/registrations')
+      .set('x-admin-code', 'errado');
+    expect(wrongCode.status).toBe(401);
+
+    const validCode = await request(app)
+      .get('/api/registrations')
+      .set('x-admin-code', 'codigo-secreto-2026');
+    expect(validCode.status).toBe(200);
+    expect(validCode.body).toMatchObject({
+      maxRegistrations: 50,
+      registeredCount: 1,
+      remainingSpots: 49,
+      checkedInCount: 0,
+    });
+    expect(validCode.body.registrations).toHaveLength(1);
+    expect(validCode.body.registrations[0]).toMatchObject({
+      fullName: 'Marta Domingos',
+      email: 'marta@example.com',
+      whatsapp: '+244923111222',
+    });
   });
 });

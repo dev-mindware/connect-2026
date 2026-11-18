@@ -18,6 +18,7 @@ const envSchema = z.object({
     .string()
     .default('connect-2026-dev-secret-key-change-in-production'),
   ADMIN_API_KEY: z.string().default(''),
+  ADMIN_ACCESS_CODE: z.string().default(''),
   RESEND_API_KEY: z.string().default(''),
   RESEND_FROM_EMAIL: z.string().default(''),
   SMTP_HOST: z.string().default(''),

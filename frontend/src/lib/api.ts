@@ -145,6 +145,98 @@ export function getTicketPdfUrl(qrToken: string): string {
   return apiUrl(`/api/tickets/pdf?token=${encodeURIComponent(qrToken)}`);
 }
 
+export interface RegistrantListItem {
+  id: string;
+  fullName: string;
+  address: string | null;
+  email: string;
+  whatsapp: string;
+  ticketCode: string;
+  qrToken: string;
+  qrUrl: string;
+  emailStatus: 'PENDING' | 'SENT' | 'SKIPPED' | 'FAILED';
+  checkedInAt: string | null;
+  createdAt: string;
+}
+
+export interface RegistrationsListResponse {
+  maxRegistrations: number;
+  registeredCount: number;
+  remainingSpots: number;
+  checkedInCount: number;
+  registrations: RegistrantListItem[];
+}
+
+export async function fetchRegistrationsList(
+  accessCode: string,
+): Promise<RegistrationsListResponse> {
+  const res = await fetch(apiUrl('/api/registrations'), {
+    headers: {
+      'x-admin-code': accessCode,
+    },
+  });
+
+  const data = (await res.json().catch(() => ({}))) as Partial<
+    RegistrationsListResponse & { message?: string; error?: string }
+  >;
+
+  if (!res.ok || !Array.isArray(data.registrations)) {
+    throw new ApiRequestError(
+      data.message ?? 'Não foi possível carregar a listagem.',
+      data.error ?? 'LIST_FETCH_FAILED',
+      res.status,
+    );
+  }
+
+  return data as RegistrationsListResponse;
+}
+
+function escapeCsvCell(value: string): string {
+  const escaped = value.replaceAll('"', '""');
+  return `"${escaped}"`;
+}
+
+export function exportRegistrationsCsv(
+  registrations: RegistrantListItem[],
+): void {
+  const headers = [
+    'Codigo',
+    'Nome Completo',
+    'E-mail',
+    'WhatsApp',
+    'Morada',
+    'Estado E-mail',
+    'Check-in',
+    'Data Inscricao',
+  ];
+
+  const rows = registrations.map((item) =>
+    [
+      item.ticketCode,
+      item.fullName,
+      item.email,
+      item.whatsapp,
+      item.address ?? '',
+      item.emailStatus,
+      item.checkedInAt ?? 'Pendente',
+      item.createdAt,
+    ]
+      .map(escapeCsvCell)
+      .join(','),
+  );
+
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'inscritos-connect-2026.csv';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function checkInTicket(
   qrToken: string,
   adminApiKey: string,

@@ -3,28 +3,41 @@ import { FlyerSection } from '@/components/FlyerSection';
 import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
 import { Navbar } from '@/components/Navbar';
+import { RegistrationsListPage } from '@/components/RegistrationsListPage';
 import { SpeakersSection } from '@/components/SpeakersSection';
 import { TicketPassView } from '@/components/TicketPassView';
 import { Toaster } from '@/components/ui/sonner';
 import { fetchEventStatus, type EventCapacityStatus } from '@/lib/api';
 
-function getTicketRouteState(): {
-  token: string | null;
-  autoDownloadPdf: boolean;
-} {
+type AppRoute =
+  | { view: 'home' }
+  | { view: 'ticket'; token: string; autoDownloadPdf: boolean }
+  | { view: 'registrations' };
+
+function resolveRoute(): AppRoute {
+  const path = window.location.pathname;
   const params = new URLSearchParams(window.location.search);
+
+  if (path.startsWith('/inscritos')) {
+    return { view: 'registrations' };
+  }
+
   const token = params.get('token') ?? params.get('convite');
   const autoDownloadPdf = params.get('download') === 'pdf';
-  if (token) return { token, autoDownloadPdf };
-  if (window.location.pathname.startsWith('/convite')) {
-    return { token: '', autoDownloadPdf };
+  if (token) {
+    return { view: 'ticket', token, autoDownloadPdf };
   }
-  return { token: null, autoDownloadPdf: false };
+
+  if (path.startsWith('/convite')) {
+    return { view: 'ticket', token: '', autoDownloadPdf };
+  }
+
+  return { view: 'home' };
 }
 
 export function App() {
   const [status, setStatus] = useState<EventCapacityStatus | null>(null);
-  const { token: ticketToken, autoDownloadPdf } = getTicketRouteState();
+  const route = resolveRoute();
 
   const refreshStatus = useCallback(async () => {
     const next = await fetchEventStatus();
@@ -34,19 +47,21 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (ticketToken === null) {
+    if (route.view === 'home') {
       void refreshStatus();
     }
-  }, [refreshStatus, ticketToken]);
+  }, [refreshStatus, route.view]);
 
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background text-foreground">
       <Navbar />
       <main className="flex-1">
-        {ticketToken !== null ? (
+        {route.view === 'registrations' ? (
+          <RegistrationsListPage />
+        ) : route.view === 'ticket' ? (
           <TicketPassView
-            token={ticketToken}
-            autoDownloadPdf={autoDownloadPdf}
+            token={route.token}
+            autoDownloadPdf={route.autoDownloadPdf}
           />
         ) : (
           <>

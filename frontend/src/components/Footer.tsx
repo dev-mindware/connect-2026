@@ -30,7 +30,15 @@ export function Footer() {
 
         <Separator className="my-5" />
 
-        <p className="text-xs text-muted-foreground">{EVENT_INFO.admission}</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <p>{EVENT_INFO.admission}</p>
+          <a
+            href="/inscritos"
+            className="underline-offset-4 hover:text-primary hover:underline"
+          >
+            Área da organização
+          </a>
+        </div>
       </div>
     </footer>
   );

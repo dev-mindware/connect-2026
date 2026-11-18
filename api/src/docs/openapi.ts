@@ -193,6 +193,17 @@ export function buildOpenApiSpec(port: number): Record<string, unknown> {
         },
       },
       '/api/registrations': {
+        get: {
+          tags: ['Inscrições'],
+          summary: 'Listar todos os inscritos (acesso protegido)',
+          description:
+            'Devolve a listagem completa de inscritos e métricas de lotação mediante o código definido em ADMIN_ACCESS_CODE (ou ADMIN_API_KEY).',
+          security: [{ AdminApiKey: [] }],
+          responses: {
+            '200': { description: 'Listagem de inscritos' },
+            '401': { description: 'Código de acesso em falta ou inválido' },
+          },
+        },
         post: {
           tags: ['Inscrições'],
           summary: 'Criar nova inscrição e enviar convite',

@@ -46,6 +46,7 @@ export type CheckInOutcome =
 export interface RegistrationRepository {
   ping: () => Promise<boolean>;
   count: () => Promise<number>;
+  findAll: () => Promise<RegistrationRecord[]>;
   createWithCapacity: (
     params: CreateRegistrationParams,
   ) => Promise<CreateRegistrationOutcome>;
@@ -75,6 +76,12 @@ export function createPrismaRegistrationRepository(
 
     async count(): Promise<number> {
       return prisma.registration.count();
+    },
+
+    async findAll(): Promise<RegistrationRecord[]> {
+      return prisma.registration.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
     },
 
     async createWithCapacity(

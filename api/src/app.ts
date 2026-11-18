@@ -88,7 +88,7 @@ export function createApp({
         callback(new Error('Origem não autorizada pelo CORS.'));
       },
       methods: ['GET', 'POST', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'x-admin-api-key'],
+      allowedHeaders: ['Content-Type', 'x-admin-api-key', 'x-admin-code'],
     }),
   );
   app.use(express.json({ limit: '64kb' }));
@@ -114,6 +114,18 @@ export function createApp({
       error: 'RATE_LIMITED',
       message:
         'Limite de reenvios atingido temporariamente. Tente dentro de alguns minutos.',
+    },
+  });
+
+  const adminListLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: env.NODE_ENV === 'test' ? 1000 : 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error: 'RATE_LIMITED',
+      message:
+        'Muitas tentativas de acesso administrativo. Aguarde alguns minutos.',
     },
   });
 
@@ -166,6 +178,64 @@ export function createApp({
       });
     }
   });
+
+  app.get(
+    '/api/registrations',
+    adminListLimiter,
+    async (req: Request, res: Response) => {
+      const expectedCode = (
+        env.ADMIN_ACCESS_CODE || env.ADMIN_API_KEY
+      ).trim();
+      const providedCode = (
+        req.header('x-admin-code') ??
+        req.header('x-admin-api-key') ??
+        ''
+      ).trim();
+
+      if (!expectedCode || !constantTimeEquals(providedCode, expectedCode)) {
+        res.status(401).json({
+          error: 'UNAUTHORIZED',
+          message: 'Código de acesso inválido.',
+        });
+        return;
+      }
+
+      try {
+        const records = await repository.findAll();
+        const checkedInCount = records.filter(
+          (record) => record.checkedInAt !== null,
+        ).length;
+        const maxRegistrations = env.MAX_REGISTRATIONS;
+        const registeredCount = records.length;
+        const remainingSpots = Math.max(0, maxRegistrations - registeredCount);
+
+        res.status(200).json({
+          maxRegistrations,
+          registeredCount,
+          remainingSpots,
+          checkedInCount,
+          registrations: records.map((record) => ({
+            id: record.id,
+            fullName: record.fullName,
+            address: record.address,
+            email: record.email,
+            whatsapp: record.whatsapp,
+            ticketCode: record.ticketCode,
+            qrToken: record.qrToken,
+            qrUrl: buildTicketQrUrl(record.qrToken, frontendBaseUrl),
+            emailStatus: record.emailStatus,
+            checkedInAt: record.checkedInAt?.toISOString() ?? null,
+            createdAt: record.createdAt.toISOString(),
+          })),
+        });
+      } catch {
+        res.status(500).json({
+          error: 'INTERNAL_ERROR',
+          message: 'Não foi possível carregar a listagem de inscritos.',
+        });
+      }
+    },
+  );
 
   app.post(
     '/api/registrations',
@@ -477,10 +547,18 @@ export function createApp({
   });
 
   app.post('/api/checkin', async (req: Request, res: Response) => {
-    const providedKey = req.header('x-admin-api-key') ?? '';
+    const providedKey = (
+      req.header('x-admin-api-key') ??
+      req.header('x-admin-code') ??
+      ''
+    ).trim();
+    const validCheckinKeys = [env.ADMIN_API_KEY, env.ADMIN_ACCESS_CODE]
+      .map((key) => key.trim())
+      .filter(Boolean);
+
     if (
-      !env.ADMIN_API_KEY ||
-      !constantTimeEquals(providedKey, env.ADMIN_API_KEY)
+      validCheckinKeys.length === 0 ||
+      !validCheckinKeys.some((key) => constantTimeEquals(providedKey, key))
     ) {
       res.status(401).json({
         error: 'UNAUTHORIZED',
