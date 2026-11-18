@@ -158,6 +158,18 @@ export interface MailService {
   sendInvitation: (payload: InvitationMailPayload) => Promise<MailDispatchResult>;
 }
 
+export function formatSenderAddress(
+  rawFrom: string,
+  displayName = 'Connect 2026',
+): string {
+  const trimmed = rawFrom.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('<') && trimmed.includes('>')) {
+    return trimmed;
+  }
+  return `${displayName} <${trimmed}>`;
+}
+
 export function createMailService(env: AppEnv): MailService {
   const resend =
     env.RESEND_API_KEY && env.RESEND_FROM_EMAIL
@@ -219,7 +231,7 @@ export function createMailService(env: AppEnv): MailService {
           }
 
           const response = await resend.emails.send({
-            from: env.RESEND_FROM_EMAIL,
+            from: formatSenderAddress(env.RESEND_FROM_EMAIL),
             to: [payload.email],
             subject,
             html,
@@ -269,7 +281,7 @@ export function createMailService(env: AppEnv): MailService {
           }
 
           await transporter.sendMail({
-            from: env.SMTP_FROM || env.SMTP_USER,
+            from: formatSenderAddress(env.SMTP_FROM || env.SMTP_USER),
             to: payload.email,
             subject,
             text,

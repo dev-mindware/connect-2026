@@ -10,7 +10,7 @@ import type {
   RegistrationRecord,
   RegistrationRepository,
 } from './repositories/registration.repository';
-import type { MailService } from './services/mail.service';
+import { formatSenderAddress, type MailService } from './services/mail.service';
 
 function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
   return {
@@ -369,5 +369,14 @@ describe('Connect 2026 API', () => {
       .send({ qrToken: qrUrl });
     expect(checkinByUrl.status).toBe(200);
     expect(checkinByUrl.body.attendee.fullName).toBe('Joana Pedro');
+  });
+
+  it('formata o nome do remetente como Connect 2026 quando só há endereço de e-mail', () => {
+    expect(formatSenderAddress('no-reply@mindware.ao')).toBe(
+      'Connect 2026 <no-reply@mindware.ao>',
+    );
+    expect(
+      formatSenderAddress('Connect 2026 <no-reply@mindware.ao>'),
+    ).toBe('Connect 2026 <no-reply@mindware.ao>');
   });
 });
