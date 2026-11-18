@@ -4,6 +4,7 @@ import {
   CalendarPlus,
   CheckCircle2,
   Download,
+  FileDown,
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
@@ -27,12 +28,14 @@ import {
   ApiRequestError,
   checkInTicket,
   downloadCalendarInvite,
+  getTicketPdfUrl,
   verifyTicketByToken,
   type TicketRegistration,
 } from '@/lib/api';
 
 interface TicketPassViewProps {
   token: string;
+  autoDownloadPdf?: boolean;
 }
 
 const ADMIN_KEY_STORAGE = 'connect2026_admin_checkin_key';
@@ -48,7 +51,10 @@ function formatDateTime(iso: string): string {
   }
 }
 
-export function TicketPassView({ token }: TicketPassViewProps) {
+export function TicketPassView({
+  token,
+  autoDownloadPdf = false,
+}: TicketPassViewProps) {
   const [ticket, setTicket] = useState<TicketRegistration | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +86,14 @@ export function TicketPassView({ token }: TicketPassViewProps) {
         const registration = await verifyTicketByToken(token);
         if (active) {
           setTicket(registration);
+          if (autoDownloadPdf) {
+            const anchor = document.createElement('a');
+            anchor.href = getTicketPdfUrl(registration.qrToken);
+            anchor.download = `convite-connect-2026-${registration.ticketCode.toLowerCase()}.pdf`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+          }
         }
       } catch (err) {
         if (active) {
@@ -254,10 +268,19 @@ export function TicketPassView({ token }: TicketPassViewProps) {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Button type="button" onClick={handleDownloadQr}>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button asChild>
+                  <a
+                    href={getTicketPdfUrl(ticket.qrToken)}
+                    download={`convite-connect-2026-${ticket.ticketCode.toLowerCase()}.pdf`}
+                  >
+                    <FileDown />
+                    Transferir PDF
+                  </a>
+                </Button>
+                <Button type="button" variant="outline" onClick={handleDownloadQr}>
                   <Download />
-                  Descarregar QR Code
+                  QR Code
                 </Button>
                 <Button
                   type="button"
@@ -265,7 +288,7 @@ export function TicketPassView({ token }: TicketPassViewProps) {
                   onClick={() => downloadCalendarInvite(ticket.ticketCode)}
                 >
                   <CalendarPlus />
-                  Adicionar ao Calendário
+                  Calendário
                 </Button>
               </div>
 

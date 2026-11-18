@@ -1,5 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CalendarPlus, Download, Loader2, Mail, RotateCcw } from 'lucide-react';
+import {
+  CalendarPlus,
+  Download,
+  FileDown,
+  Loader2,
+  Mail,
+  RotateCcw,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +26,7 @@ import { EVENT_INFO } from '@/data/event';
 import {
   ApiRequestError,
   downloadCalendarInvite,
+  getTicketPdfUrl,
   resendInvitationEmail,
   submitRegistration,
   suggestEmailCorrection,
@@ -199,10 +207,19 @@ export function RegistrationCard({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <Button type="button" onClick={handleDownloadQr}>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <Button asChild>
+              <a
+                href={getTicketPdfUrl(ticket.qrToken)}
+                download={`convite-connect-2026-${ticket.ticketCode.toLowerCase()}.pdf`}
+              >
+                <FileDown />
+                Transferir PDF
+              </a>
+            </Button>
+            <Button type="button" variant="outline" onClick={handleDownloadQr}>
               <Download />
-              Descarregar QR Code
+              QR Code
             </Button>
             <Button
               type="button"
@@ -210,7 +227,7 @@ export function RegistrationCard({
               onClick={() => downloadCalendarInvite(ticket.ticketCode)}
             >
               <CalendarPlus />
-              Adicionar ao Calendário
+              Calendário
             </Button>
           </div>
         </CardContent>

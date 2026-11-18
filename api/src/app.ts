@@ -12,6 +12,7 @@ import {
   registrationInputSchema,
 } from './schemas/registration.schema';
 import type { MailService } from './services/mail.service';
+import { generateInvitationPdfBuffer } from './services/pdf.service';
 import {
   buildTicketQrUrl,
   createSignedTicket,
@@ -52,6 +53,11 @@ export function createApp({
     env.PUBLIC_FRONTEND_URL,
     env.FRONTEND_URL,
   );
+  const publicApiBaseUrl = (env.PUBLIC_API_URL ?? '').trim().replace(/\/+$/, '');
+  const buildPdfDownloadUrl = (qrToken: string, qrUrl: string): string =>
+    publicApiBaseUrl
+      ? `${publicApiBaseUrl}/api/tickets/pdf?token=${encodeURIComponent(qrToken)}`
+      : `${qrUrl}&download=pdf`;
   const openApiSpec = buildOpenApiSpec(env.PORT);
 
   app.use(
@@ -228,12 +234,27 @@ export function createApp({
           return;
         }
 
+        const pdfBuffer = await generateInvitationPdfBuffer({
+          fullName: outcome.registration.fullName,
+          email: outcome.registration.email,
+          whatsapp: outcome.registration.whatsapp,
+          address: outcome.registration.address,
+          ticketCode: outcome.registration.ticketCode,
+          qrCodePngBuffer: ticket.qrCodePngBuffer,
+        });
+
         const mailResult = await mailService.sendInvitation({
           fullName: outcome.registration.fullName,
           email: outcome.registration.email,
           whatsapp: outcome.registration.whatsapp,
           ticketCode: outcome.registration.ticketCode,
+          qrUrl: ticket.qrUrl,
+          pdfUrl: buildPdfDownloadUrl(
+            outcome.registration.qrToken,
+            ticket.qrUrl,
+          ),
           qrCodePngBuffer: ticket.qrCodePngBuffer,
+          pdfBuffer,
         });
 
         await repository.updateEmailStatus(
@@ -296,12 +317,23 @@ export function createApp({
 
         const qrUrl = buildTicketQrUrl(record.qrToken, frontendBaseUrl);
         const { qrCodePngBuffer } = await renderQrAssets(qrUrl);
+        const pdfBuffer = await generateInvitationPdfBuffer({
+          fullName: record.fullName,
+          email: record.email,
+          whatsapp: record.whatsapp,
+          address: record.address,
+          ticketCode: record.ticketCode,
+          qrCodePngBuffer,
+        });
         const mailResult = await mailService.sendInvitation({
           fullName: record.fullName,
           email: record.email,
           whatsapp: record.whatsapp,
           ticketCode: record.ticketCode,
+          qrUrl,
+          pdfUrl: buildPdfDownloadUrl(record.qrToken, qrUrl),
           qrCodePngBuffer,
+          pdfBuffer,
         });
 
         await repository.updateEmailStatus(
@@ -382,6 +414,64 @@ export function createApp({
       res.status(500).json({
         error: 'INTERNAL_ERROR',
         message: 'Não foi possível consultar os dados do convite.',
+      });
+    }
+  });
+
+  app.get('/api/tickets/pdf', async (req: Request, res: Response) => {
+    const rawToken =
+      typeof req.query.token === 'string' ? req.query.token.trim() : '';
+
+    if (!rawToken) {
+      res.status(400).json({
+        error: 'VALIDATION_ERROR',
+        message: 'Token do convite em falta.',
+      });
+      return;
+    }
+
+    const verification = verifyQrToken(rawToken, env.TICKET_SECRET);
+    if (!verification.valid || !verification.ticketCode) {
+      res.status(400).json({
+        error: 'INVALID_QR_SIGNATURE',
+        message: 'Convite inválido ou assinatura adulterada.',
+      });
+      return;
+    }
+
+    try {
+      const record = await repository.findByTicketCode(verification.ticketCode);
+      if (!record) {
+        res.status(404).json({
+          error: 'NOT_FOUND',
+          message: 'Inscrição não encontrada.',
+        });
+        return;
+      }
+
+      const qrUrl = buildTicketQrUrl(record.qrToken, frontendBaseUrl);
+      const { qrCodePngBuffer } = await renderQrAssets(qrUrl);
+      const pdfBuffer = await generateInvitationPdfBuffer({
+        fullName: record.fullName,
+        email: record.email,
+        whatsapp: record.whatsapp,
+        address: record.address,
+        ticketCode: record.ticketCode,
+        qrCodePngBuffer,
+      });
+
+      const filename = `convite-connect-2026-${record.ticketCode.toLowerCase()}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+      res.setHeader('Cache-Control', 'no-store');
+      res.status(200).send(pdfBuffer);
+    } catch {
+      res.status(500).json({
+        error: 'INTERNAL_ERROR',
+        message: 'Não foi possível gerar o PDF do convite.',
       });
     }
   });

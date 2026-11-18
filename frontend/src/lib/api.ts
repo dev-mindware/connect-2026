@@ -141,6 +141,10 @@ export async function verifyTicketByToken(
   return data.registration;
 }
 
+export function getTicketPdfUrl(qrToken: string): string {
+  return apiUrl(`/api/tickets/pdf?token=${encodeURIComponent(qrToken)}`);
+}
+
 export async function checkInTicket(
   qrToken: string,
   adminApiKey: string,

@@ -308,6 +308,37 @@ export function buildOpenApiSpec(port: number): Record<string, unknown> {
           },
         },
       },
+      '/api/tickets/pdf': {
+        get: {
+          tags: ['Inscrições'],
+          summary: 'Transferir o convite oficial em formato PDF',
+          description:
+            'Valida a assinatura HMAC do token e gera o ficheiro PDF do convite com o QR Code embutido.',
+          parameters: [
+            {
+              name: 'token',
+              in: 'query',
+              required: true,
+              schema: {
+                type: 'string',
+                example: 'C26-7K9P2M.8a1f3b4c5d6e7f8a9b0c1d2e',
+              },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Ficheiro PDF do convite',
+              content: {
+                'application/pdf': {
+                  schema: { type: 'string', format: 'binary' },
+                },
+              },
+            },
+            '400': { description: 'Token inválido ou em falta' },
+            '404': { description: 'Inscrição não encontrada' },
+          },
+        },
+      },
       '/api/checkin': {
         post: {
           tags: ['Check-in'],

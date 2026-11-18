@@ -7,7 +7,10 @@ export interface InvitationMailPayload {
   email: string;
   whatsapp: string;
   ticketCode: string;
+  qrUrl?: string;
+  pdfUrl?: string;
   qrCodePngBuffer: Buffer;
+  pdfBuffer?: Buffer;
 }
 
 export interface MailDispatchResult {
@@ -31,68 +34,116 @@ export function buildInvitationEmailHtml(
   const safeName = escapeHtml(payload.fullName);
   const safeCode = escapeHtml(payload.ticketCode);
   const safeWhatsapp = escapeHtml(payload.whatsapp);
+  const safeQrUrl = payload.qrUrl ? escapeHtml(payload.qrUrl) : '';
+  const safePdfUrl = payload.pdfUrl ? escapeHtml(payload.pdfUrl) : '';
+
+  const buttons: string[] = [];
+  if (safeQrUrl) {
+    buttons.push(
+      `<a href="${safeQrUrl}" target="_blank" rel="noreferrer" style="display:inline-block;background-color:#0038D6;color:#FFFFFF;font-size:14px;font-weight:600;text-decoration:none;padding:11px 18px;border-radius:8px;margin:4px;">Abrir convite digital</a>`,
+    );
+  }
+  if (safePdfUrl) {
+    buttons.push(
+      `<a href="${safePdfUrl}" target="_blank" rel="noreferrer" style="display:inline-block;background-color:#FFFFFF;color:#07143B;border:1px solid #DCE5FB;font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px;margin:4px;">Transferir PDF</a>`,
+    );
+  }
+
+  const actionBlock =
+    buttons.length > 0
+      ? `<tr>
+        <td align="center" style="padding:20px 0 4px 0;">
+          ${buttons.join('')}
+        </td>
+      </tr>`
+      : '';
 
   return `<!DOCTYPE html>
 <html lang="pt">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Convite Connect 2026</title>
+    <title>Convite Connect 2026 (${safeCode})</title>
   </head>
-  <body style="margin:0;padding:0;background-color:#F4F7FF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#07143B;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px;">
+  <body style="margin:0;padding:0;background-color:#F6F8FC;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#07143B;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:36px 16px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#FFFFFF;border:1px solid #DCE5FB;border-radius:16px;overflow:hidden;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:520px;background-color:#FFFFFF;border:1px solid #E2E8F4;border-top:3px solid #0038D6;border-radius:12px;overflow:hidden;">
             <tr>
-              <td style="background-color:#0038D6;padding:28px 32px;color:#FFFFFF;">
-                <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#FFD400;">
-                  Entrada Gratuita · Convite Oficial
-                </p>
-                <h1 style="margin:0;font-size:28px;line-height:1.15;font-weight:800;color:#FFFFFF;">
-                  Connect 2026
-                </h1>
-                <p style="margin:8px 0 0 0;font-size:15px;line-height:1.5;color:#E6EEFF;">
+              <td style="padding:28px 32px 20px 32px;border-bottom:1px solid #E2E8F4;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="vertical-align:middle;">
+                      <span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:6px;background-color:#0038D6;color:#FFD400;font-size:14px;font-weight:800;vertical-align:middle;margin-right:8px;">C</span>
+                      <span style="font-size:17px;font-weight:700;color:#07143B;vertical-align:middle;letter-spacing:-0.02em;">Connect <span style="color:#0038D6;">2026</span></span>
+                    </td>
+                    <td align="right" style="vertical-align:middle;">
+                      <span style="display:inline-block;background-color:#F1F5FF;border:1px solid #DCE5FB;border-radius:6px;padding:4px 10px;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;font-weight:600;color:#07143B;">
+                        ${safeCode}
+                      </span>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:10px 0 0 0;font-size:13px;line-height:1.5;color:#4B5A7D;">
                   O Peso dos Sonhos, O Ritmo da Rotina
                 </p>
               </td>
             </tr>
+
             <tr>
-              <td style="padding:28px 32px;">
-                <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;color:#07143B;">
-                  Olá, <strong>${safeName}</strong>. A sua inscrição foi confirmada. Apresente o QR Code abaixo à entrada do evento.
+              <td style="padding:28px 32px 24px 32px;">
+                <p style="margin:0 0 8px 0;font-size:16px;font-weight:600;line-height:1.4;color:#07143B;">
+                  Olá, ${safeName}.
+                </p>
+                <p style="margin:0;font-size:14px;line-height:1.6;color:#4B5A7D;">
+                  A sua inscrição está confirmada. Apresente este código QR à entrada do evento no Shopping Viana.
                 </p>
 
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#F8FAFF;border:1px solid #DCE5FB;border-radius:12px;margin:20px 0;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:24px 0 0 0;">
                   <tr>
-                    <td align="center" style="padding:24px 16px;">
-                      <img src="cid:connect2026-qr" alt="QR Code do convite ${safeCode}" width="210" height="210" style="display:block;border-radius:8px;background:#FFFFFF;padding:8px;border:1px solid #DCE5FB;" />
-                      <p style="margin:14px 0 0 0;font-size:13px;font-weight:700;letter-spacing:0.12em;color:#0038D6;">
-                        CÓDIGO: ${safeCode}
+                    <td align="center">
+                      <img src="cid:connect2026-qr" alt="QR Code do convite ${safeCode}" width="184" height="184" style="display:block;border-radius:8px;background:#FFFFFF;padding:10px;border:1px solid #E2E8F4;" />
+                      <p style="margin:10px 0 0 0;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:12px;font-weight:600;letter-spacing:0.08em;color:#4B5A7D;">
+                        ${safeCode}
                       </p>
                     </td>
                   </tr>
+                  ${actionBlock}
                 </table>
+              </td>
+            </tr>
 
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #E8EEF9;padding-top:16px;font-size:14px;line-height:1.7;color:#324168;">
+            <tr>
+              <td style="padding:0 32px 24px 32px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-top:1px solid #E2E8F4;font-size:13px;line-height:1.5;">
                   <tr>
-                    <td style="padding:4px 0;"><strong>Data e hora:</strong> 06 de Dezembro · 13h00</td>
+                    <td style="padding:12px 0 8px 0;color:#4B5A7D;width:110px;">Data e hora</td>
+                    <td style="padding:12px 0 8px 0;color:#07143B;font-weight:600;" align="right">06 de Dezembro, 13h00</td>
                   </tr>
                   <tr>
-                    <td style="padding:4px 0;"><strong>Local:</strong> Shopping Viana</td>
+                    <td style="padding:8px 0;border-top:1px solid #F1F5FF;color:#4B5A7D;">Local</td>
+                    <td style="padding:8px 0;border-top:1px solid #F1F5FF;color:#07143B;font-weight:600;" align="right">Shopping Viana</td>
                   </tr>
                   <tr>
-                    <td style="padding:4px 0;"><strong>WhatsApp registado:</strong> ${safeWhatsapp}</td>
+                    <td style="padding:8px 0;border-top:1px solid #F1F5FF;color:#4B5A7D;">Entrada</td>
+                    <td style="padding:8px 0;border-top:1px solid #F1F5FF;color:#07143B;font-weight:600;" align="right">Gratuita · Por inscrição</td>
                   </tr>
                   <tr>
-                    <td style="padding:4px 0;"><strong>Organização:</strong> A.M.T.T.S · Contacto: +244 934 242 419</td>
+                    <td style="padding:8px 0;border-top:1px solid #F1F5FF;color:#4B5A7D;">WhatsApp</td>
+                    <td style="padding:8px 0;border-top:1px solid #F1F5FF;color:#07143B;font-weight:600;" align="right">${safeWhatsapp}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0 0 0;border-top:1px solid #F1F5FF;color:#4B5A7D;">Organização</td>
+                    <td style="padding:8px 0 0 0;border-top:1px solid #F1F5FF;color:#07143B;font-weight:600;" align="right">A.M.T.T.S · +244 934 242 419</td>
                   </tr>
                 </table>
               </td>
             </tr>
+
             <tr>
-              <td style="background-color:#07143B;padding:18px 32px;font-size:12px;color:#C7D4F5;text-align:center;">
-                Connect 2026 · Guarde este e-mail para acesso rápido no dia do evento.
+              <td style="padding:16px 32px;background-color:#FAFBFD;border-top:1px solid #E2E8F4;font-size:12px;line-height:1.5;color:#64748B;text-align:center;">
+                Connect 2026 · Guarde este e-mail para acesso rápido à entrada.
               </td>
             </tr>
           </table>
@@ -135,26 +186,45 @@ export function createMailService(env: AppEnv): MailService {
         '',
         'A sua inscrição no Connect 2026 — O Peso dos Sonhos, O Ritmo da Rotina está confirmada.',
         `Código do convite: ${payload.ticketCode}`,
+        ...(payload.qrUrl ? [`Convite digital: ${payload.qrUrl}`] : []),
+        ...(payload.pdfUrl ? [`Transferir PDF: ${payload.pdfUrl}`] : []),
         'Data: 06 de Dezembro · 13h00',
         'Local: Shopping Viana',
         'Contacto: +244 934 242 419',
       ].join('\n');
 
+      const pdfFileName = `convite-connect-2026-${payload.ticketCode.toLowerCase()}.pdf`;
+
       if (resend) {
         try {
+          const attachments: Array<{
+            filename: string;
+            content: Buffer;
+            contentId?: string;
+            contentType?: string;
+          }> = [
+            {
+              filename: `${payload.ticketCode}.png`,
+              content: payload.qrCodePngBuffer,
+              contentId: 'connect2026-qr',
+            },
+          ];
+
+          if (payload.pdfBuffer) {
+            attachments.push({
+              filename: pdfFileName,
+              content: payload.pdfBuffer,
+              contentType: 'application/pdf',
+            });
+          }
+
           const response = await resend.emails.send({
             from: env.RESEND_FROM_EMAIL,
             to: [payload.email],
             subject,
             html,
             text,
-            attachments: [
-              {
-                filename: `${payload.ticketCode}.png`,
-                content: payload.qrCodePngBuffer,
-                contentId: 'connect2026-qr',
-              },
-            ],
+            attachments,
           });
 
           if (response.error) {
@@ -177,19 +247,34 @@ export function createMailService(env: AppEnv): MailService {
 
       if (transporter) {
         try {
+          const attachments: Array<{
+            filename: string;
+            content: Buffer;
+            cid?: string;
+            contentType?: string;
+          }> = [
+            {
+              filename: `${payload.ticketCode}.png`,
+              content: payload.qrCodePngBuffer,
+              cid: 'connect2026-qr',
+            },
+          ];
+
+          if (payload.pdfBuffer) {
+            attachments.push({
+              filename: pdfFileName,
+              content: payload.pdfBuffer,
+              contentType: 'application/pdf',
+            });
+          }
+
           await transporter.sendMail({
             from: env.SMTP_FROM || env.SMTP_USER,
             to: payload.email,
             subject,
             text,
             html,
-            attachments: [
-              {
-                filename: `${payload.ticketCode}.png`,
-                content: payload.qrCodePngBuffer,
-                cid: 'connect2026-qr',
-              },
-            ],
+            attachments,
           });
           return { status: 'SENT', provider: 'smtp' };
         } catch (err) {

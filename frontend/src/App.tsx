@@ -8,19 +8,23 @@ import { TicketPassView } from '@/components/TicketPassView';
 import { Toaster } from '@/components/ui/sonner';
 import { fetchEventStatus, type EventCapacityStatus } from '@/lib/api';
 
-function getTicketTokenFromUrl(): string | null {
+function getTicketRouteState(): {
+  token: string | null;
+  autoDownloadPdf: boolean;
+} {
   const params = new URLSearchParams(window.location.search);
   const token = params.get('token') ?? params.get('convite');
-  if (token) return token;
+  const autoDownloadPdf = params.get('download') === 'pdf';
+  if (token) return { token, autoDownloadPdf };
   if (window.location.pathname.startsWith('/convite')) {
-    return '';
+    return { token: '', autoDownloadPdf };
   }
-  return null;
+  return { token: null, autoDownloadPdf: false };
 }
 
 export function App() {
   const [status, setStatus] = useState<EventCapacityStatus | null>(null);
-  const ticketToken = getTicketTokenFromUrl();
+  const { token: ticketToken, autoDownloadPdf } = getTicketRouteState();
 
   const refreshStatus = useCallback(async () => {
     const next = await fetchEventStatus();
@@ -40,7 +44,10 @@ export function App() {
       <Navbar />
       <main className="flex-1">
         {ticketToken !== null ? (
-          <TicketPassView token={ticketToken} />
+          <TicketPassView
+            token={ticketToken}
+            autoDownloadPdf={autoDownloadPdf}
+          />
         ) : (
           <>
             <FlyerSection />

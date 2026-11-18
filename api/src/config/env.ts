@@ -12,6 +12,7 @@ const envSchema = z.object({
   MAX_REGISTRATIONS: z.coerce.number().int().min(1).default(200),
   FRONTEND_URL: z.string().default('http://localhost:5173,http://localhost:3000'),
   PUBLIC_FRONTEND_URL: z.string().default(''),
+  PUBLIC_API_URL: z.string().default(''),
   DATABASE_URL: z.string().default(''),
   TICKET_SECRET: z
     .string()

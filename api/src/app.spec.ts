@@ -19,6 +19,7 @@ function createTestEnv(overrides: Partial<AppEnv> = {}): AppEnv {
     MAX_REGISTRATIONS: 2,
     FRONTEND_URL: 'http://localhost:5173',
     PUBLIC_FRONTEND_URL: '',
+    PUBLIC_API_URL: '',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     TICKET_SECRET: 'test-ticket-secret-with-more-than-32-characters',
     ADMIN_API_KEY: 'test-admin-api-key',
@@ -169,6 +170,9 @@ describe('Connect 2026 API', () => {
     expect(res.body.registration.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
     expect(res.body.registration.emailStatus).toBe('SENT');
     expect(sendInvitation).toHaveBeenCalledTimes(1);
+    const mailCall = sendInvitation.mock.calls[0]?.[0];
+    expect(mailCall?.pdfBuffer?.subarray(0, 5).toString('utf8')).toBe('%PDF-');
+    expect(mailCall?.pdfUrl).toContain('download=pdf');
   });
 
   it('impede inscrições duplicadas e respeita o limite MAX_REGISTRATIONS', async () => {
@@ -338,6 +342,26 @@ describe('Connect 2026 API', () => {
       '/api/tickets/verify?token=C26-AAAAAA.invalid',
     );
     expect(invalidVerify.status).toBe(400);
+
+    const pdfRes = await request(app)
+      .get(`/api/tickets/pdf?token=${encodeURIComponent(qrToken)}`)
+      .buffer(true)
+      .parse((res, callback) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => callback(null, Buffer.concat(chunks)));
+      });
+    expect(pdfRes.status).toBe(200);
+    expect(pdfRes.headers['content-type']).toContain('application/pdf');
+    expect(pdfRes.headers['content-disposition']).toContain('attachment;');
+    expect((pdfRes.body as Buffer).subarray(0, 5).toString('utf8')).toBe(
+      '%PDF-',
+    );
+
+    const invalidPdf = await request(app).get(
+      '/api/tickets/pdf?token=C26-AAAAAA.invalid',
+    );
+    expect(invalidPdf.status).toBe(400);
 
     const checkinByUrl = await request(app)
       .post('/api/checkin')
